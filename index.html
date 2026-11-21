@@ -13,6 +13,16 @@
     @media(max-width:820px){.app{padding:16px 20px 24px}.topbar{margin-bottom:15px}.layout{grid-template-columns:1fr;gap:22px}.intro{padding:5px 0 0;display:grid;grid-template-columns:1fr auto;align-items:end;column-gap:14px}.eyebrow,.intro h1,.intro p{grid-column:1}.intro h1{font-size:clamp(37px,9vw,54px);margin:9px 0}.intro p{font-size:14px}.score-card{grid-column:2;grid-row:1/4;margin:0 0 4px;padding:10px 12px}.mode-grid{grid-template-columns:repeat(5,1fr)}.mode{min-height:67px;padding:8px}.mode b{font-size:12px}.mode span{font-size:10px}.selection{margin-top:18px}.primary{max-width:420px}.game-shell{max-width:590px;width:100%;margin:auto}.touch-controls{display:grid}}
     @media(max-width:520px){.app{padding:12px 13px 20px}.topbar{margin-bottom:12px}.brand{font-size:17px}.brand-mark{width:34px;height:34px}.top-actions{gap:6px}.soft-button{padding:8px 10px;font-size:12px}.icon-button{width:37px;height:37px}.layout{gap:17px}.intro{grid-template-columns:1fr auto}.intro p{font-size:13px;max-width:30ch}.score-card{gap:7px;padding:8px 9px}.score-icon{font-size:18px}.score-card strong{font-size:16px}.mode-grid{grid-template-columns:repeat(3,1fr)}.mode{min-height:58px}.mode:nth-child(n+4){min-height:53px}.game-shell{padding:11px;border-radius:20px}.hud{padding-bottom:8px}.hud strong{font-size:17px}.hud small{font-size:10px}.game-name{margin-bottom:8px}.board-wrap{border-radius:11px}.board-foot{margin-top:10px}.status{font-size:11px}.board-actions button{padding:7px 9px}.touch-controls{grid-template-columns:repeat(3,48px);grid-template-rows:repeat(2,42px);margin-top:11px}}
     @media(max-width:360px){.intro h1{font-size:37px}.mode-grid{grid-template-columns:repeat(2,1fr)}.mode:nth-child(n+4){min-height:58px}}
+    .overlay-card .secondary-button{display:block;margin:12px auto 0;background:transparent;border:1px solid var(--line);color:var(--text);font-size:14px}
+    .overlay-card button[hidden]{display:none}
+    .board-actions button:disabled{opacity:.45;cursor:default}
+    .confirm-dialog{color:var(--text);margin:auto}
+    .confirm-dialog::backdrop{background:#050906bb;backdrop-filter:blur(5px)}
+    .confirm-dialog h2{margin:0 0 12px}
+    .confirm-dialog p{color:var(--muted);margin:0 0 20px}
+    .confirm-actions{display:flex;justify-content:flex-end;gap:10px}
+    .confirm-actions button{border-radius:11px;padding:10px 15px}
+    .confirm-actions .accept{background:var(--green);color:#172315;font-weight:800}
   </style>
 </head>
 <body>
@@ -27,7 +37,7 @@
     <section class="game-shell" aria-label="游戏区域">
       <div class="hud"><div class="hud-item"><small>本局得分</small><strong id="score">000</strong></div><div class="hud-item"><small>最高纪录</small><strong id="hudBest">000</strong></div><div class="hud-item"><small id="metricLabel">速度</small><strong id="metric">1.0×</strong></div></div>
       <div class="game-name" id="gameModeName">经典模式 · 慢慢来，吃到就是赚到</div>
-      <div class="board-wrap" id="boardWrap"><canvas id="board" aria-label="贪吃蛇游戏棋盘"></canvas><div class="overlay" id="overlay"><div class="overlay-card"><div class="emoji">🐍</div><h2 id="overlayTitle">准备好了吗？</h2><p id="overlayText">选择玩法，然后开始你的第一局。</p><button id="overlayBtn">开始游戏</button></div></div></div>
+      <div class="board-wrap" id="boardWrap"><canvas id="board" aria-label="贪吃蛇游戏棋盘"></canvas><div class="overlay" id="overlay"><div class="overlay-card"><div class="emoji">🐍</div><h2 id="overlayTitle">准备好了吗？</h2><p id="overlayText">选择玩法，然后开始你的第一局。</p><button id="overlayBtn">开始游戏</button><button id="homeBtn" class="secondary-button" hidden>返回主页</button></div></div></div>
       <div class="board-foot"><div class="status"><i></i><span id="statusText">等待开局</span></div><div class="board-actions"><button id="pauseBtn">Ⅱ 暂停</button><button id="restartBtn">↻ 重开</button></div></div>
       <div class="touch-controls" aria-label="触屏方向控制"><button data-dir="up" aria-label="向上">↑</button><button data-dir="left" aria-label="向左">←</button><button data-dir="down" aria-label="向下">↓</button><button data-dir="right" aria-label="向右">→</button></div>
     </section>
@@ -38,43 +48,617 @@
   <div class="setting-row"><span>音效<small>吃到食物与游戏结束提示</small></span><button class="switch on" id="soundSwitch" aria-label="切换音效"></button></div>
   <div class="setting-row"><span>棋盘网格<small>显示格线辅助判断距离</small></span><button class="switch on" id="gridSwitch" aria-label="切换网格"></button></div>
   <div class="setting-row"><span>本地纪录<small>最高分保存在当前浏览器</small></span><button class="danger" id="resetRecord">重置纪录</button></div>
-</section></div><div class="toast" id="toast"></div>
+</section></div>
+<dialog class="dialog confirm-dialog" id="confirmDialog" aria-labelledby="confirmTitle" aria-describedby="confirmText">
+  <h2 id="confirmTitle">确认操作</h2>
+  <p id="confirmText"></p>
+  <form method="dialog" class="confirm-actions">
+    <button id="confirmCancel" class="soft-button" value="cancel">取消</button>
+    <button id="confirmAccept" class="accept" value="confirm">确认</button>
+  </form>
+</dialog>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 <script>
-(()=>{
-  const $=id=>document.getElementById(id), canvas=$('board'),ctx=canvas.getContext('2d');
-  const modes=[['classic','经典','撞墙结束'],['wrap','穿墙','环游棋盘'],['obstacle','障碍','躲开路障'],['timed','限时','60 秒冲分'],['rush','加速','越吃越快']];
-  const descriptions={classic:'慢慢来，吃到就是赚到',wrap:'穿过边界，从另一侧继续',obstacle:'注意前方，障碍会逐渐增加',timed:'60 秒内尽可能多吃果子',rush:'越吃越快，挑战你的反应'};
-  const storage={get(k,d){try{return JSON.parse(localStorage.getItem('snakeclub.'+k))??d}catch{return d}},set(k,v){try{localStorage.setItem('snakeclub.'+k,JSON.stringify(v))}catch{}}};
-  let mode='classic',snake=[],dir={x:1,y:0},queued={x:1,y:0},food=null,obstacles=[],score=0,best=storage.get('best',{}),running=false,paused=false,timer=0,stepMs=155,remaining=60,gridOn=storage.get('grid',true),soundOn=storage.get('sound',true),theme=storage.get('theme','dark'),audio=null,toastTimer=0;
-  const N=24; function cellSize(){return canvas.width/N} function setCanvas(){const r=canvas.getBoundingClientRect(),d=Math.min(devicePixelRatio||1,2);canvas.width=Math.max(1,Math.round(r.width*d));canvas.height=canvas.width;draw()} new ResizeObserver(setCanvas).observe(canvas);
-  function draw(){const w=canvas.width;if(!w)return;const s=w/N;ctx.fillStyle=theme==='light'?'#edf5e9':'#111a13';ctx.fillRect(0,0,w,w);if(gridOn){ctx.strokeStyle=theme==='light'?'#dce8d7':'#ffffff0b';ctx.lineWidth=1;for(let i=1;i<N;i++){ctx.beginPath();ctx.moveTo(i*s,0);ctx.lineTo(i*s,w);ctx.stroke();ctx.beginPath();ctx.moveTo(0,i*s);ctx.lineTo(w,i*s);ctx.stroke()}}
-    obstacles.forEach(p=>{ctx.fillStyle=theme==='light'?'#89978a':'#526255';rounded(p.x*s+2,p.y*s+2,s-4,s-4,s*.18);ctx.fill();ctx.fillStyle='#ffffff18';rounded(p.x*s+4,p.y*s+4,s-8,s*.24,s*.1);ctx.fill()});
-    if(food){ctx.save();ctx.shadowColor=food.type==='star'?'#ffd166':'#ff7869';ctx.shadowBlur=s*.65;ctx.fillStyle=food.type==='star'?'#ffd166':'#ff7869';ctx.beginPath();ctx.arc((food.x+.5)*s,(food.y+.5)*s,s*.34,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;ctx.fillStyle='#a5d36b';ctx.beginPath();ctx.ellipse((food.x+.65)*s,(food.y+.22)*s,s*.13,s*.08,-.7,0,Math.PI*2);ctx.fill();ctx.restore()}
-    snake.forEach((p,i)=>{const inset=i===0?s*.09:s*.15;ctx.fillStyle=i===0?'#d4ff8c':(i%2?'#8fdf4e':'#a9ec63');if(i===0){ctx.shadowColor='#b8f36b';ctx.shadowBlur=s*.5}rounded(p.x*s+inset,p.y*s+inset,s-inset*2,s-inset*2,s*.27);ctx.fill();ctx.shadowBlur=0;if(i===0){ctx.fillStyle='#25401d';const ex=dir.x===1?.69:dir.x===-1?.31:.62,ey=dir.y===1?.69:dir.y===-1?.31:.31;ctx.beginPath();ctx.arc((p.x+ex)*s,(p.y+ey)*s,s*.055,0,7);ctx.arc((p.x+(dir.y? .38:.38))*s,(p.y+(dir.x? .38:.38))*s,s*.055,0,7);ctx.fill()}})
+(() => {
+  'use strict';
+
+  const $ = id => document.getElementById(id);
+  const canvas = $('board');
+  const ctx = canvas.getContext('2d');
+  const N = 24;
+  const modes = [
+    ['classic', '经典', '撞墙结束'],
+    ['wrap', '穿墙', '环游棋盘'],
+    ['obstacle', '障碍', '躲开路障'],
+    ['timed', '限时', '60 秒冲分'],
+    ['rush', '加速', '越吃越快']
+  ];
+  const descriptions = {
+    classic: '慢慢来，吃到就是赚到',
+    wrap: '穿过边界，从另一侧继续',
+    obstacle: '注意前方，障碍会逐渐增加',
+    timed: '60 秒冲分 · 碰撞扣 5 分并缩短一节',
+    rush: '越吃越快，挑战你的反应'
+  };
+  const directions = {
+    up: { x: 0, y: -1 },
+    down: { x: 0, y: 1 },
+    left: { x: -1, y: 0 },
+    right: { x: 1, y: 0 }
+  };
+  const keyDirections = {
+    arrowup: directions.up, w: directions.up,
+    arrowdown: directions.down, s: directions.down,
+    arrowleft: directions.left, a: directions.left,
+    arrowright: directions.right, d: directions.right
+  };
+  const storage = {
+    get(key, fallback) {
+      try {
+        return JSON.parse(localStorage.getItem('snakeclub.' + key)) ?? fallback;
+      } catch {
+        return fallback;
+      }
+    },
+    set(key, value) {
+      try {
+        localStorage.setItem('snakeclub.' + key, JSON.stringify(value));
+      } catch {
+        // 游戏仍可在浏览器禁止本地存储时继续运行。
+      }
+    }
+  };
+
+  let mode = 'classic';
+  let snake = [];
+  let dir = directions.right;
+  let queued = dir;
+  let food = null;
+  let obstacles = [];
+  let score = 0;
+  const savedBest = storage.get('best', {});
+  let best = savedBest && typeof savedBest === 'object' && !Array.isArray(savedBest)
+    ? savedBest : {};
+  let running = false;
+  let paused = false;
+  let frameId = 0;
+  let lastFrameAt = 0;
+  let movementElapsed = 0;
+  let remaining = 60;
+  let settingsResume = false;
+  let gridOn = storage.get('grid', true);
+  let soundOn = storage.get('sound', true);
+  let theme = storage.get('theme', 'dark');
+  let audio = null;
+  let toastTimer = 0;
+
+  function setCanvas() {
+    const bounds = canvas.getBoundingClientRect();
+    const ratio = Math.min(devicePixelRatio || 1, 2);
+    canvas.width = Math.max(1, Math.round(bounds.width * ratio));
+    canvas.height = canvas.width;
+    draw();
   }
-  function rounded(x,y,w,h,r){ctx.beginPath();ctx.roundRect(x,y,w,h,r)}
-  function randCell(){let p,n=0;do{p={x:Math.floor(Math.random()*N),y:Math.floor(Math.random()*N)};n++}while(n<1000&&(snake.some(q=>q.x===p.x&&q.y===p.y)||obstacles.some(q=>q.x===p.x&&q.y===p.y)));return p}
-  function spawnFood(){food=randCell()}
-  function buildModes(){const g=$('modeGrid');g.innerHTML='';modes.forEach(([id,name,sub])=>{let b=document.createElement('button');b.className='mode'+(id===mode?' selected':'');b.innerHTML=`<b>${name}</b><span>${sub}</span>`;b.onclick=()=>{mode=id;document.querySelectorAll('.mode').forEach(x=>x.classList.remove('selected'));b.classList.add('selected');$('gameModeName').textContent=name+'模式 · '+descriptions[id];$('metricLabel').textContent=id==='timed'?'剩余时间':'速度';if(!running)draw()};g.append(b)})}
-  function start(){clearInterval(timer);snake=[{x:11,y:12},{x:10,y:12},{x:9,y:12}];dir=queued={x:1,y:0};score=0;elapsed=0;remaining=60;obstacles=[];if(mode==='obstacle')for(let i=0;i<12;i++)obstacles.push(randCell());spawnFood();running=true;paused=false;last=performance.now();$('overlay').classList.add('hidden');$('statusText').textContent='游戏进行中';$('pauseBtn').textContent='Ⅱ 暂停';sync();tickLoop();draw()}
-  function tickLoop(){clearInterval(timer);stepMs=Math.max(62,155-Math.min(80,score*.8)-(mode==='rush'?Math.min(35,score*1.2):0));timer=setInterval(step,stepMs)}
-  function step(){if(!running||paused)return;dir=queued;const head={x:snake[0].x+dir.x,y:snake[0].y+dir.y};if(mode==='wrap'){head.x=(head.x+N)%N;head.y=(head.y+N)%N}else if(mode==='timed'){if(head.x<0||head.x>=N||head.y<0||head.y>=N){penalty();return}}else if(head.x<0||head.x>=N||head.y<0||head.y>=N){end(false);return}
-    const eating=food&&head.x===food.x&&head.y===food.y,body=eating?snake:snake.slice(0,-1);if(body.some(p=>p.x===head.x&&p.y===head.y)||obstacles.some(p=>p.x===head.x&&p.y===head.y)){if(mode==='timed'){penalty();return}else{end(false);return}}
-    snake.unshift(head);if(eating){score+=10;beep(540,.07);if(mode==='obstacle'&&score%40===0){const block=randCell();obstacles.push(block)}spawnFood();tickLoop()}else snake.pop();if(mode==='timed'){remaining-=stepMs/1000;if(remaining<=0){remaining=0;end(true);return}}sync();draw()}
-  function penalty(){score=Math.max(0,score-5);snake=[{x:11,y:12},{x:10,y:12},{x:9,y:12}];dir=queued={x:1,y:0};remaining=Math.max(0,remaining-3);if(remaining===0){end(true);return}spawnFood();sync();draw();beep(180,.12)}
-  function end(timeout){running=false;paused=false;clearInterval(timer);const prev=best[mode]||0,isRecord=score>prev;if(isRecord){best[mode]=score;storage.set('best',best);$('bestScore').textContent=score;$('hudBest').textContent=String(score).padStart(3,'0')}$('overlayTitle').textContent=timeout?'时间到！':(isRecord?'新纪录！':'游戏结束');$('overlayText').textContent=`本局得分 ${score} · ${isRecord?'刷新了个人最佳！':'再来一局，刷新纪录吧。'}`;$('overlayBtn').textContent='再来一局';$('overlay').classList.remove('hidden');$('statusText').textContent=timeout?'挑战结束':'本局结束';beep(isRecord?760:140,.18);sync()}
-  function pause(){if(!running)return;paused=!paused;$('pauseBtn').textContent=paused?'▶ 继续':'Ⅱ 暂停';$('statusText').textContent=paused?'已暂停':'游戏进行中';if(paused){$('overlayTitle').textContent='休息一下';$('overlayText').textContent='准备好了就继续。';$('overlayBtn').textContent='继续游戏';$('overlay').classList.remove('hidden')}else $('overlay').classList.add('hidden')}
-  function sync(){ $('score').textContent=String(score).padStart(3,'0');$('hudBest').textContent=String(best[mode]||0).padStart(3,'0');$('metric').textContent=mode==='timed'?`${Math.ceil(remaining)}s`:`${(155/Math.max(62,155-Math.min(80,score*.8)-(mode==='rush'?Math.min(35,score*1.2):0))).toFixed(1)}×`;$('bestScore').textContent=best[mode]||0 }
-  function change(d){if(!running){return}if(d.x===-dir.x&&d.y===-dir.y)return;queued=d}
-  function beep(freq,dur){if(!soundOn)return;try{audio??=new AudioContext();let o=audio.createOscillator(),g=audio.createGain();o.frequency.value=freq;o.type='sine';g.gain.value=.04;o.connect(g);g.connect(audio.destination);o.start();g.gain.exponentialRampToValueAtTime(.001,audio.currentTime+dur);o.stop(audio.currentTime+dur)}catch{}}
-  function toggle(el,val,key){val=!val;el.classList.toggle('on',val);storage.set(key,val);return val}
-  function toast(msg){$('toast').textContent=msg;$('toast').classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').classList.remove('show'),1800)}
-  buildModes();$('gameModeName').textContent='经典模式 · '+descriptions.classic;sync();draw();
-  $('startBtn').onclick=start;$('restartBtn').onclick=start;$('overlayBtn').onclick=()=>paused?pause():start();$('pauseBtn').onclick=pause;
-  $('settingsBtn').onclick=()=>$('settingsModal').hidden=false;$('closeSettings').onclick=()=>$('settingsModal').hidden=true;$('settingsModal').onclick=e=>{if(e.target===$('settingsModal'))$('settingsModal').hidden=true};
-  $('themeSelect').value=theme;document.body.classList.toggle('light',theme==='light');$('themeSelect').onchange=e=>{theme=e.target.value;storage.set('theme',theme);document.body.classList.toggle('light',theme==='light');draw()};$('soundSwitch').classList.toggle('on',soundOn);$('gridSwitch').classList.toggle('on',gridOn);$('soundSwitch').onclick=()=>soundOn=toggle($('soundSwitch'),soundOn,'sound');$('gridSwitch').onclick=()=>{gridOn=toggle($('gridSwitch'),gridOn,'grid');draw()};$('resetRecord').onclick=()=>{best={};storage.set('best',best);sync();toast('本地纪录已重置')};$('recordsBtn').onclick=()=>{const names={classic:'经典',wrap:'穿墙',obstacle:'障碍',timed:'限时',rush:'加速'};toast(Object.keys(best).length?Object.entries(best).map(([k,v])=>`${names[k]} ${v}`).join(' · '):'还没有纪录，开始挑战吧！')};
-  document.addEventListener('keydown',e=>{const key=e.key.toLowerCase(),dirs={arrowup:{x:0,y:-1},w:{x:0,y:-1},arrowdown:{x:0,y:1},s:{x:0,y:1},arrowleft:{x:-1,y:0},a:{x:-1,y:0},arrowright:{x:1,y:0},d:{x:1,y:0}};if(dirs[key]){e.preventDefault();change(dirs[key])}else if(key===' '){e.preventDefault();pause()}else if(key==='enter'&&!running)start()});
-  document.querySelectorAll('.touch-controls button').forEach(b=>{const map={up:{x:0,y:-1},down:{x:0,y:1},left:{x:-1,y:0},right:{x:1,y:0}};b.addEventListener('pointerdown',e=>{e.preventDefault();change(map[b.dataset.dir])})});let touchStart=null;$('boardWrap').addEventListener('touchstart',e=>{if(e.touches.length)touchStart={x:e.touches[0].clientX,y:e.touches[0].clientY}},{passive:true});$('boardWrap').addEventListener('touchend',e=>{if(!touchStart)return;const t=e.changedTouches[0],dx=t.clientX-touchStart.x,dy=t.clientY-touchStart.y;if(Math.max(Math.abs(dx),Math.abs(dy))>25)change(Math.abs(dx)>Math.abs(dy)?{x:Math.sign(dx),y:0}:{x:0,y:Math.sign(dy)});touchStart=null},{passive:true});
+
+  function rounded(x, y, width, height, radius) {
+    ctx.beginPath();
+    ctx.roundRect(x, y, width, height, radius);
+  }
+
+  function draw() {
+    const width = canvas.width;
+    const size = width / N;
+    ctx.fillStyle = theme === 'light' ? '#edf5e9' : '#111a13';
+    ctx.fillRect(0, 0, width, width);
+    if (gridOn) {
+      ctx.strokeStyle = theme === 'light' ? '#dce8d7' : '#ffffff0b';
+      ctx.lineWidth = 1;
+      for (let i = 1; i < N; i++) {
+        ctx.beginPath();
+        ctx.moveTo(i * size, 0);
+        ctx.lineTo(i * size, width);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(0, i * size);
+        ctx.lineTo(width, i * size);
+        ctx.stroke();
+      }
+    }
+    for (const point of obstacles) {
+      ctx.fillStyle = theme === 'light' ? '#89978a' : '#526255';
+      rounded(point.x * size + 2, point.y * size + 2, size - 4, size - 4, size * 0.18);
+      ctx.fill();
+    }
+    if (food) {
+      ctx.save();
+      ctx.shadowColor = '#ff7869';
+      ctx.shadowBlur = size * 0.65;
+      ctx.fillStyle = '#ff7869';
+      ctx.beginPath();
+      ctx.arc((food.x + 0.5) * size, (food.y + 0.5) * size, size * 0.34, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = '#a5d36b';
+      ctx.beginPath();
+      ctx.ellipse((food.x + 0.65) * size, (food.y + 0.22) * size,
+        size * 0.13, size * 0.08, -0.7, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+    snake.forEach((point, index) => {
+      const inset = size * (index === 0 ? 0.09 : 0.15);
+      ctx.fillStyle = index === 0 ? '#d4ff8c' : (index % 2 ? '#8fdf4e' : '#a9ec63');
+      ctx.shadowColor = '#b8f36b';
+      ctx.shadowBlur = index === 0 ? size * 0.5 : 0;
+      rounded(point.x * size + inset, point.y * size + inset,
+        size - inset * 2, size - inset * 2, size * 0.27);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      if (index === 0) {
+        const eyeX = dir.x === 1 ? 0.69 : dir.x === -1 ? 0.31 : 0.5;
+        const eyeY = dir.y === 1 ? 0.69 : dir.y === -1 ? 0.31 : 0.5;
+        ctx.fillStyle = '#25401d';
+        for (const side of [-1, 1]) {
+          ctx.beginPath();
+          ctx.arc((point.x + eyeX + (dir.y ? side * 0.16 : 0)) * size,
+            (point.y + eyeY + (dir.x ? side * 0.16 : 0)) * size, size * 0.055, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    });
+  }
+
+  function sameCell(a, b) {
+    return a.x === b.x && a.y === b.y;
+  }
+
+  function randCell() {
+    const occupied = new Set([...snake, ...obstacles].map(point => point.x + ',' + point.y));
+    const free = [];
+    for (let y = 0; y < N; y++) {
+      for (let x = 0; x < N; x++) {
+        if (!occupied.has(x + ',' + y)) free.push({ x, y });
+      }
+    }
+    return free.length ? free[Math.floor(Math.random() * free.length)] : null;
+  }
+
+  function spawnFood() {
+    food = randCell();
+    if (!food && running) end(false, '棋盘填满了！');
+  }
+
+  function getStepMs() {
+    const extra = mode === 'rush' ? Math.min(35, score * 1.2) : 0;
+    return Math.max(62, 155 - Math.min(80, score * 0.8) - extra);
+  }
+
+  function stopLoop() {
+    cancelAnimationFrame(frameId);
+    frameId = 0;
+  }
+
+  function updateClock(now) {
+    const elapsed = Math.max(0, now - lastFrameAt);
+    lastFrameAt = now;
+    if (mode === 'timed') {
+      remaining = Math.max(0, remaining - elapsed / 1000);
+      if (remaining === 0) end(true);
+    }
+    return elapsed;
+  }
+
+  function frame(now) {
+    if (!running || paused) return;
+    const elapsed = updateClock(now);
+    if (!running) return;
+    movementElapsed += elapsed;
+    if (movementElapsed >= getStepMs()) {
+      // 卡顿后只走一步，倒计时仍扣除实际经过的时间。
+      movementElapsed %= getStepMs();
+      step();
+      draw();
+    }
+    sync();
+    if (running && !paused) frameId = requestAnimationFrame(frame);
+  }
+
+  function saveBest() {
+    if (score <= (best[mode] || 0)) return false;
+    best[mode] = score;
+    storage.set('best', best);
+    return true;
+  }
+
+  function showOverlay(title, text, button, showHome = false) {
+    $('overlayTitle').textContent = title;
+    $('overlayText').textContent = text;
+    $('overlayBtn').textContent = button;
+    $('homeBtn').hidden = !showHome;
+    $('overlay').classList.remove('hidden');
+  }
+
+  function showHome() {
+    if (running) saveBest();
+    stopLoop();
+    running = false;
+    paused = false;
+    snake = [];
+    obstacles = [];
+    food = null;
+    score = 0;
+    remaining = 60;
+    movementElapsed = 0;
+    $('pauseBtn').textContent = 'Ⅱ 暂停';
+    $('statusText').textContent = '等待开局';
+    showOverlay('准备好了吗？', '选择玩法，然后开始你的下一局。', '开始游戏');
+    sync();
+    draw();
+  }
+
+  function hasOpenModal() {
+    return !$('settingsModal').hidden || $('confirmDialog').open;
+  }
+
+  function start() {
+    if (hasOpenModal()) return;
+    if (running) saveBest();
+    stopLoop();
+    snake = [{ x: 11, y: 12 }, { x: 10, y: 12 }, { x: 9, y: 12 }];
+    dir = directions.right;
+    queued = dir;
+    score = 0;
+    remaining = 60;
+    movementElapsed = 0;
+    obstacles = [];
+    if (mode === 'obstacle') {
+      for (let i = 0; i < 12; i++) obstacles.push(randCell());
+    }
+    running = true;
+    paused = false;
+    spawnFood();
+    lastFrameAt = performance.now();
+    $('overlay').classList.add('hidden');
+    $('homeBtn').hidden = true;
+    $('pauseBtn').textContent = 'Ⅱ 暂停';
+    $('statusText').textContent = '游戏进行中';
+    sync();
+    draw();
+    frameId = requestAnimationFrame(frame);
+    if (audio) audio.resume().catch(() => {});
+  }
+
+  function step() {
+    dir = queued;
+    const head = { x: snake[0].x + dir.x, y: snake[0].y + dir.y };
+    if (mode === 'wrap') {
+      head.x = (head.x + N) % N;
+      head.y = (head.y + N) % N;
+    }
+    const outside = head.x < 0 || head.x >= N || head.y < 0 || head.y >= N;
+    const eating = food && sameCell(head, food);
+    const body = eating ? snake : snake.slice(0, -1);
+    const collision = outside || body.some(point => sameCell(point, head))
+      || obstacles.some(point => sameCell(point, head));
+    if (collision) {
+      if (mode === 'timed') penalty();
+      else end(false);
+      return;
+    }
+    snake.unshift(head);
+    if (eating) {
+      score += 10;
+      beep(540, 0.07);
+      if (mode === 'obstacle' && score % 40 === 0 && snake.length + obstacles.length < N * N - 1) {
+        obstacles.push(randCell());
+      }
+      spawnFood();
+    } else {
+      snake.pop();
+    }
+  }
+
+  function recoverTimedDirection() {
+    const choices = [
+      { x: dir.y, y: -dir.x },
+      { x: -dir.y, y: dir.x },
+      dir
+    ];
+    const freeDirection = choices.find(direction => {
+      const next = { x: snake[0].x + direction.x, y: snake[0].y + direction.y };
+      return next.x >= 0 && next.x < N && next.y >= 0 && next.y < N
+        && !snake.slice(0, -1).some(point => sameCell(point, next));
+    });
+    if (freeDirection) {
+      dir = freeDirection;
+      queued = dir;
+      return;
+    }
+    // 蛇头被包围时重新排列蛇身，保持缩短后的长度并留出下一格。
+    const path = [];
+    for (let y = 0; y < N; y++) {
+      for (let column = 0; column < N; column++) {
+        path.push({ x: y % 2 ? N - 1 - column : column, y });
+      }
+    }
+    const next = path[snake.length];
+    snake = path.slice(0, snake.length).reverse();
+    dir = { x: next.x - snake[0].x, y: next.y - snake[0].y };
+    queued = dir;
+    if (food && snake.some(point => sameCell(point, food))) spawnFood();
+  }
+
+  function penalty() {
+    score = Math.max(0, score - 5);
+    const shortened = snake.length > 3;
+    if (shortened) snake.pop();
+    recoverTimedDirection();
+    toast(shortened ? '碰撞 -5 分，蛇身缩短一节' : '碰撞 -5 分，蛇身保持三节');
+    beep(180, 0.12);
+  }
+
+  function end(timeout, title) {
+    stopLoop();
+    running = false;
+    paused = false;
+    const newRecord = saveBest();
+    showOverlay(title || (timeout ? '时间到！' : newRecord ? '新纪录！' : '游戏结束'),
+      '本局得分 ' + score + ' · ' + (newRecord ? '刷新了个人最佳！' : '再来一局，刷新纪录吧。'),
+      '再来一局', true);
+    $('pauseBtn').textContent = 'Ⅱ 暂停';
+    $('statusText').textContent = timeout ? '挑战结束' : '本局结束';
+    beep(newRecord ? 760 : 140, 0.18);
+    sync();
+  }
+
+  function pause() {
+    if (!running) return;
+    if (paused) {
+      paused = false;
+      lastFrameAt = performance.now();
+      $('overlay').classList.add('hidden');
+      $('pauseBtn').textContent = 'Ⅱ 暂停';
+      $('statusText').textContent = '游戏进行中';
+      frameId = requestAnimationFrame(frame);
+    } else {
+      updateClock(performance.now());
+      if (!running) return;
+      stopLoop();
+      paused = true;
+      showOverlay('休息一下', '准备好了就继续。', '继续游戏');
+      $('pauseBtn').textContent = '▶ 继续';
+      $('statusText').textContent = '已暂停';
+    }
+    sync();
+  }
+
+  function sync() {
+    $('score').textContent = String(score).padStart(3, '0');
+    $('hudBest').textContent = String(best[mode] || 0).padStart(3, '0');
+    $('bestScore').textContent = best[mode] || 0;
+    $('metricLabel').textContent = mode === 'timed' ? '剩余时间' : '速度';
+    $('metric').textContent = mode === 'timed'
+      ? Math.ceil(remaining) + 's' : (155 / getStepMs()).toFixed(1) + '×';
+    $('pauseBtn').disabled = !running;
+  }
+
+  function requestConfirmation(title, message, action) {
+    const dialog = $('confirmDialog');
+    if (dialog.open) return Promise.resolve(false);
+    const resumeAfterCancel = running && !paused;
+    if (resumeAfterCancel) pause();
+    $('confirmTitle').textContent = title;
+    $('confirmText').textContent = message;
+    $('confirmAccept').textContent = action;
+    dialog.returnValue = '';
+    return new Promise(resolve => {
+      dialog.addEventListener('close', () => {
+        const accepted = dialog.returnValue === 'confirm';
+        if (!accepted && resumeAfterCancel && running && paused) pause();
+        resolve(accepted);
+      }, { once: true });
+      dialog.showModal();
+      $('confirmCancel').focus();
+    });
+  }
+
+  async function selectMode(nextMode) {
+    if (nextMode === mode) return;
+    if (running) {
+      const accepted = await requestConfirmation('切换玩法？',
+        '切换会结束当前局并保存本局最高分。取消可继续原局。', '切换玩法');
+      if (!accepted) return;
+    }
+    showHome();
+    mode = nextMode;
+    updateMode();
+    sync();
+  }
+
+  function updateMode() {
+    for (const button of $('modeGrid').children) {
+      const selected = button.dataset.mode === mode;
+      button.classList.toggle('selected', selected);
+      button.setAttribute('aria-pressed', String(selected));
+    }
+    const name = modes.find(item => item[0] === mode)[1];
+    $('gameModeName').textContent = name + '模式 · ' + descriptions[mode];
+  }
+
+  function buildModes() {
+    for (const [id, name, subtitle] of modes) {
+      const button = document.createElement('button');
+      button.className = 'mode';
+      button.dataset.mode = id;
+      const heading = document.createElement('b');
+      heading.textContent = name;
+      const detail = document.createElement('span');
+      detail.textContent = subtitle;
+      button.append(heading, detail);
+      button.onclick = () => selectMode(id);
+      $('modeGrid').append(button);
+    }
+  }
+
+  function change(direction) {
+    if (!running || paused || hasOpenModal()) return;
+    if (direction.x === -dir.x && direction.y === -dir.y) return;
+    queued = direction;
+  }
+
+  function beep(frequency, duration) {
+    if (!soundOn) return;
+    try {
+      audio ??= new AudioContext();
+      const oscillator = audio.createOscillator();
+      const gain = audio.createGain();
+      oscillator.frequency.value = frequency;
+      gain.gain.value = 0.04;
+      oscillator.connect(gain);
+      gain.connect(audio.destination);
+      oscillator.start();
+      gain.gain.exponentialRampToValueAtTime(0.001, audio.currentTime + duration);
+      oscillator.stop(audio.currentTime + duration);
+    } catch {
+      // 浏览器未允许音频时保留游戏操作。
+    }
+  }
+
+  function toggle(element, value, key) {
+    const enabled = !value;
+    element.classList.toggle('on', enabled);
+    element.setAttribute('aria-pressed', String(enabled));
+    storage.set(key, enabled);
+    return enabled;
+  }
+
+  function toast(message) {
+    $('toast').textContent = message;
+    $('toast').classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => $('toast').classList.remove('show'), 2200);
+  }
+
+  function openSettings() {
+    settingsResume = running && !paused;
+    if (settingsResume) pause();
+    $('settingsModal').hidden = false;
+    $('closeSettings').focus();
+  }
+
+  function closeSettings() {
+    $('settingsModal').hidden = true;
+    $('settingsBtn').focus();
+    if (settingsResume && running && paused) pause();
+    settingsResume = false;
+  }
+
+  buildModes();
+  updateMode();
+  sync();
+  new ResizeObserver(setCanvas).observe(canvas);
+  $('startBtn').onclick = start;
+  $('restartBtn').onclick = start;
+  $('overlayBtn').onclick = () => paused ? pause() : start();
+  $('pauseBtn').onclick = pause;
+  $('homeBtn').onclick = () => {
+    showHome();
+    $('startBtn').focus({ preventScroll: true });
+    $('app').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+  $('settingsBtn').onclick = openSettings;
+  $('closeSettings').onclick = closeSettings;
+  $('settingsModal').onclick = event => {
+    if (event.target === $('settingsModal')) closeSettings();
+  };
+  $('themeSelect').value = theme;
+  document.body.classList.toggle('light', theme === 'light');
+  $('themeSelect').onchange = event => {
+    theme = event.target.value;
+    storage.set('theme', theme);
+    document.body.classList.toggle('light', theme === 'light');
+    draw();
+  };
+  $('soundSwitch').classList.toggle('on', soundOn);
+  $('gridSwitch').classList.toggle('on', gridOn);
+  $('soundSwitch').onclick = () => { soundOn = toggle($('soundSwitch'), soundOn, 'sound'); };
+  $('gridSwitch').onclick = () => {
+    gridOn = toggle($('gridSwitch'), gridOn, 'grid');
+    draw();
+  };
+  $('resetRecord').onclick = async () => {
+    const accepted = await requestConfirmation('重置全部纪录？',
+      '五种玩法的本地最高分都会清空，此操作无法撤销。', '确认重置');
+    if (!accepted) return;
+    best = {};
+    storage.set('best', best);
+    sync();
+    toast('本地纪录已重置');
+  };
+  $('recordsBtn').onclick = () => {
+    const records = modes.filter(([id]) => best[id])
+      .map(([id, name]) => name + ' ' + best[id]);
+    toast(records.length ? records.join(' · ') : '还没有纪录，开始挑战吧！');
+  };
+
+  document.addEventListener('keydown', event => {
+    if ($('confirmDialog').open) return;
+    if (!$('settingsModal').hidden) {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        closeSettings();
+      }
+      if (event.key === 'Tab') {
+        const controls = Array.from($('settingsModal').querySelectorAll('button, select'));
+        const first = controls[0];
+        const last = controls[controls.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      }
+      return;
+    }
+    const key = event.key.toLowerCase();
+    if (keyDirections[key]) {
+      event.preventDefault();
+      change(keyDirections[key]);
+      return;
+    }
+    const control = event.target.closest('button, select, input, textarea, a');
+    if (key === ' ' && (running || !control)) {
+      event.preventDefault();
+      pause();
+    } else if (key === 'enter' && !running && !control) {
+      start();
+    }
+  });
+  document.querySelectorAll('.touch-controls button').forEach(button => {
+    button.addEventListener('pointerdown', event => {
+      event.preventDefault();
+      change(directions[button.dataset.dir]);
+    });
+  });
+  let touchStart = null;
+  $('boardWrap').addEventListener('touchstart', event => {
+    if (event.touches.length) {
+      touchStart = { x: event.touches[0].clientX, y: event.touches[0].clientY };
+    }
+  }, { passive: true });
+  $('boardWrap').addEventListener('touchend', event => {
+    if (!touchStart) return;
+    const touch = event.changedTouches[0];
+    const dx = touch.clientX - touchStart.x;
+    const dy = touch.clientY - touchStart.y;
+    if (Math.max(Math.abs(dx), Math.abs(dy)) > 25) {
+      change(Math.abs(dx) > Math.abs(dy)
+        ? { x: Math.sign(dx), y: 0 } : { x: 0, y: Math.sign(dy) });
+    }
+    touchStart = null;
+  }, { passive: true });
 })();
 </script>
 </body>
